@@ -2,6 +2,7 @@
 Utility functions for traffic forecasting.
 """
 
+import logging
 import polars as pl
 from pathlib import Path
 from tqdm.notebook import tqdm
@@ -173,20 +174,21 @@ def create_all_feature_dfs(target_dataframes: dict[str, pl.DataFrame], idx_hour_
     beam_ids = template_df.columns
 
     # Beam ID features
-    feature_dfs['beam_id'] = pl.DataFrame({beam_id: [beam_id] * len(template_df) for beam_id in beam_ids})
+    # feature_dfs['beam_id'] = pl.DataFrame({beam_id: [int(beam_id)] * len(template_df) for beam_id in beam_ids})
     
     # Create a DataFrame full of the idx_hour series repeated across all columns
-    feature_dfs['idx_hour'] = pl.DataFrame({beam_id: idx_hour_series for beam_id in beam_ids})
+    idx_hour_df = pl.DataFrame({beam_id: idx_hour_series for beam_id in beam_ids})
 
     # Repeating 24h and 7d features
     feature_dfs.update(create_time_feature_dfs(
-        feature_dfs['idx_hour'], config['hour_shifts'], config['weekday_shifts']))
+        idx_hour_df, config['hour_shifts'], config['weekday_shifts']))
     
     # Make list of dataframes, on which ts features will be created
     base_dataframes = make_base_dataframes(
         target_dataframes, config['feat_base_df_names'])
     
-    for df_name, df in tqdm(base_dataframes.items()):
+    for df_name, df in base_dataframes.items():
+        logging.debug(f"Creating TS features for {df_name}")
         feature_dfs.update(create_ts_feature_dfs(df_name, df, config['lags'], config['rolling_avgs'],
                            config['delta_reference_points'], config['std_windows'], config['num_zeros_windows']))
     
@@ -204,11 +206,12 @@ def convert_to_long_format(dataframes: dict[str, pl.DataFrame]) -> pl.DataFrame:
 
 def convert_to_wide_format(dataframe: pl.DataFrame, output_df_names: list[str]) -> dict[str, pl.DataFrame]:
     """
-    Convert the target and feature DataFrames to a dict of wide format DataFrames.
+    Convert DataFrames to a dict of wide format DataFrames.
+    Needs to have 'beam_id' and 'idx_hour' columns. 
     """
     wide_dfs = {}
     for df_name in output_df_names:
-        wide_df = dataframe.pivot(index='idx_hour', columns='beam_id', values=df_name)
+        wide_df = dataframe.pivot(index='idx_hour', columns='beam_id', values=df_name).drop('idx_hour')
         wide_dfs[df_name] = wide_df
     return wide_dfs
 
