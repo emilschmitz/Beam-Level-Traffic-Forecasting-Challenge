@@ -1,0 +1,28 @@
+# 168hour_shift_config.yaml
+
+lags: []
+rolling_avgs: []
+delta_reference_points: []
+std_windows: []
+num_zeros_windows: []
+hour_shifts: [168]
+weekday_shifts: []
+use_station_id_feat: True
+use_cell_id_feat: True
+use_beam_id_feat: True
+train_percentage: 0.6
+val_percentage: 0.3
+run_shap: false
+target_df_names: ['thp_vol', 'mr_number']
+feat_base_df_names: ['thp_vol', 'mr_number']
+
+xgb_hyperparams:
+  objective: 'reg:squarederror'
+  eval_metric: 'mae'
+  eta: 0.1
+  # max_depth: 6
+  subsample: 0.7
+  early_stopping_rounds: 10
+  n_estimators: 20
+  enable_categorical: True
+

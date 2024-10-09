@@ -1,0 +1,26 @@
+# seasonality_config.yaml
+
+lags: []
+rolling_avgs: []
+delta_reference_points: []
+std_windows: []
+num_zeros_windows: []
+hour_shifts: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23]
+weekday_shifts: [0, 1, 2, 3, 4, 5, 6]
+use_station_id_feat: True
+use_cell_id_feat: True
+use_beam_id_feat: True
+train_percentage: 0.6
+val_percentage: 0.3
+run_shap: false
+target_df_names: ['thp_vol']
+# feat_base_df_names: ['thp_vol']
+
+xgb_hyperparams:
+  objective: 'reg:squarederror'
+  eval_metric: 'mae'
+  eta: 0.1
+  subsample: 0.7
+  early_stopping_rounds: 10
+  n_estimators: 20
+  enable_categorical: True

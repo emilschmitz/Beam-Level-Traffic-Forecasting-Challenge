@@ -3,9 +3,12 @@ Utility functions for traffic forecasting.
 """
 
 import logging
+from numpy import dtype
+import pandas as pd
 import polars as pl
 from pathlib import Path
 from tqdm.notebook import tqdm
+import wandb
 
 
 # def create_id_features(beam_id: str, length: int) -> pl.DataFrame:
@@ -153,14 +156,17 @@ def compute_station_avg(dataframe: pl.DataFrame, station_id: int) -> pl.Series:
     station_data = dataframe.select(station_cols)
     return station_data.mean(axis=1)
 
-def create_id_feature_dfs(template_df: pl.DataFrame) -> dict[str, pl.DataFrame]:
+def create_id_feature_dfs(beam_ids: list[str], df_length: int, config: dict) -> dict[str, pl.DataFrame]:
     """
     Create DataFrames for beam, cell, and station IDs based on a template DataFrame.
     """
     id_feature_dfs = {}
-    id_feature_dfs['beam_id'] = pl.DataFrame({beam_id: [beam_id] * len(template_df) for beam_id in template_df.columns})
-    id_feature_dfs['cell_id'] = pl.DataFrame({beam_id: [extract_cell_id(beam_id)] * len(template_df) for beam_id in template_df.columns})
-    id_feature_dfs['station_id'] = pl.DataFrame({beam_id: [extract_station_id(beam_id)] * len(template_df) for beam_id in template_df.columns})
+    if config['use_beam_id_feat']:
+        id_feature_dfs['beam_id'] = pl.DataFrame({beam_id: [beam_id] * df_length for beam_id in beam_ids})
+    if config['use_cell_id_feat']:
+        id_feature_dfs['cell_id'] = pl.DataFrame({beam_id: [extract_cell_id(beam_id)] * df_length for beam_id in beam_ids})
+    if config['use_station_id_feat']:
+        id_feature_dfs['station_id'] = pl.DataFrame({beam_id: [extract_station_id(beam_id)] * df_length for beam_id in beam_ids})
 
     return id_feature_dfs
 
@@ -174,7 +180,7 @@ def create_all_feature_dfs(target_dataframes: dict[str, pl.DataFrame], idx_hour_
     beam_ids = template_df.columns
 
     # Beam ID features
-    # feature_dfs['beam_id'] = pl.DataFrame({beam_id: [int(beam_id)] * len(template_df) for beam_id in beam_ids})
+    feature_dfs.update(create_id_feature_dfs(beam_ids, df_length=len(template_df), config=config))
     
     # Create a DataFrame full of the idx_hour series repeated across all columns
     idx_hour_df = pl.DataFrame({beam_id: idx_hour_series for beam_id in beam_ids})
@@ -215,12 +221,36 @@ def convert_to_wide_format(dataframe: pl.DataFrame, output_df_names: list[str]) 
         wide_dfs[df_name] = wide_df
     return wide_dfs
 
-def create_long_format_df(target_dataframes: dict[str, pl.DataFrame], idx_hour_series: pl.Series, config: dict) -> pl.DataFrame:
+def create_long_format_df(target_dataframes: dict[str, pl.DataFrame], idx_hour_series: pl.Series, config: dict) -> pd.DataFrame:
     """
-    Create long DataFrame with features and target columns.
+    Create long PANDAS DataFrame with features and target columns.
     """
     feature_dfs = create_all_feature_dfs(target_dataframes, idx_hour_series, config)
     target_dfs = {k: v for k, v in target_dataframes.items()}
     all_train_dfs = {**feature_dfs, **target_dfs}
     long_train_df = convert_to_long_format(all_train_dfs)
+
+    # Make categorical columns
+    cat_types = make_id_cat_type(target_dataframes['thp_vol'].columns)
+    long_train_df = long_train_df.to_pandas()
+    for col in ['beam_id', 'cell_id', 'station_id']:
+        if col in long_train_df.columns:
+            long_train_df[col] = long_train_df[col].astype(cat_types[col])
+
     return long_train_df
+
+def make_id_cat_type(beam_ids: list[str]) -> dict[str, dtype]:
+    """
+    Create a dictionary of categorical types for beam, cell, and station IDs.
+    """
+    # Remove duplicates and create sets
+    cell_ids = {extract_cell_id(beam_id) for beam_id in beam_ids}
+    station_ids = {extract_station_id(beam_id) for beam_id in beam_ids}
+
+    cat_types = {
+        'beam_id': pd.CategoricalDtype(categories=beam_ids, ordered=True),
+        'cell_id': pd.CategoricalDtype(categories=cell_ids, ordered=True),
+        'station_id': pd.CategoricalDtype(categories=station_ids, ordered=True)
+    }
+
+    return cat_types
