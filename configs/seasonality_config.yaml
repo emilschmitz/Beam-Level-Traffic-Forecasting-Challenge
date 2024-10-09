@@ -13,8 +13,8 @@ use_beam_id_feat: True
 train_percentage: 0.6
 val_percentage: 0.3
 run_shap: false
-target_df_names: ['thp_vol']
-# feat_base_df_names: ['thp_vol']
+target_df_names: ['residuals']
+feat_base_df_names: ['residuals']
 
 xgb_hyperparams:
   objective: 'reg:squarederror'

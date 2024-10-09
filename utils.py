@@ -88,11 +88,18 @@ def create_time_feature_dfs(idx_hour_df: pl.DataFrame, idx_hour_shifts: list[int
 
     return {**hour_feats, **weekday_feats}
 
-def create_ts_feature_dfs(df_name: str, df: pl.DataFrame, lags: list[int], rolling_avgs: list[int], delta_reference_points: list[tuple[int, int]], std_windows: list[int], num_zeros_windows: list[int]) -> dict[str, pl.DataFrame]:
+def create_ts_feature_dfs(df_name: str, df: pl.DataFrame, lags: list[int], rolling_avgs: list[int], delta_reference_points: list[tuple[int, int]], std_windows: list[int], num_zeros_windows: list[int], push_all_lags_by: int) -> dict[str, pl.DataFrame]:
     """
     Create lag, rolling average, delta, and standard deviation features for all columns in the DataFrame.
     Returns a dict of DataFrames.
     """
+    if push_all_lags_by != 0:
+        lags = [lag + push_all_lags_by for lag in lags]
+        rolling_avgs = [window + push_all_lags_by for window in rolling_avgs]
+        delta_reference_points = [(point_pair[0] + push_all_lags_by, point_pair[1] + push_all_lags_by) for point_pair in delta_reference_points]
+        std_windows = [window + push_all_lags_by for window in std_windows]
+        num_zeros_windows = [window + push_all_lags_by for window in num_zeros_windows]
+
     lag_feats = {f"{df_name}_lag_{lag}": df.shift(lag) for lag in lags}
 
     delta_feats = {f"{df_name}_delta_{point_pair[0]}_{point_pair[1]}": (df.shift(point_pair[0]) - df.shift(point_pair[1])) for point_pair in delta_reference_points}
@@ -176,7 +183,11 @@ def create_all_feature_dfs(target_dataframes: dict[str, pl.DataFrame], idx_hour_
     Returns a dictionary of feature DataFrames.
     """
     feature_dfs = {}
-    template_df = target_dataframes['thp_vol']
+    try: 
+        template_df = target_dataframes['thp_vol']
+    except KeyError:
+        template_df = list(target_dataframes.values())[0]
+        logging.info("thp_vol not found in target_dataframes. Using first DataFrame as template.")
     beam_ids = template_df.columns
 
     # Beam ID features
@@ -196,7 +207,8 @@ def create_all_feature_dfs(target_dataframes: dict[str, pl.DataFrame], idx_hour_
     for df_name, df in base_dataframes.items():
         logging.debug(f"Creating TS features for {df_name}")
         feature_dfs.update(create_ts_feature_dfs(df_name, df, config['lags'], config['rolling_avgs'],
-                           config['delta_reference_points'], config['std_windows'], config['num_zeros_windows']))
+                           config['delta_reference_points'], config['std_windows'], config['num_zeros_windows'],
+                           config['push_all_lags_by']))
     
     return feature_dfs
 
@@ -221,17 +233,21 @@ def convert_to_wide_format(dataframe: pl.DataFrame, output_df_names: list[str]) 
         wide_dfs[df_name] = wide_df
     return wide_dfs
 
-def create_long_format_df(target_dataframes: dict[str, pl.DataFrame], idx_hour_series: pl.Series, config: dict) -> pd.DataFrame:
+def create_long_format_df(target_dataframes: dict[str, pl.DataFrame], feature_dataframes: dict[str, pl.DataFrame],
+                          idx_hour_series: pl.Series, config: dict) -> pd.DataFrame:
     """
     Create long PANDAS DataFrame with features and target columns.
     """
-    feature_dfs = create_all_feature_dfs(target_dataframes, idx_hour_series, config)
-    target_dfs = {k: v for k, v in target_dataframes.items()}
-    all_train_dfs = {**feature_dfs, **target_dfs}
+    all_train_dfs = {**feature_dataframes, **target_dataframes}
     long_train_df = convert_to_long_format(all_train_dfs)
 
     # Make categorical columns
-    cat_types = make_id_cat_type(target_dataframes['thp_vol'].columns)
+    try:
+        template_df = target_dataframes['thp_vol']
+    except KeyError:
+        template_df = list(target_dataframes.values())[0]
+        logging.info("thp_vol not found in target_dataframes. Using first DataFrame as template.")
+    cat_types = make_id_cat_type(template_df.columns)
     long_train_df = long_train_df.to_pandas()
     for col in ['beam_id', 'cell_id', 'station_id']:
         if col in long_train_df.columns:

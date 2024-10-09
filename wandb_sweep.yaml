@@ -1,0 +1,125 @@
+# sweep.yaml
+program: train.py
+method: bayes
+metric:
+  name: validation_1-mae.min  # Ensure this matches the metric logged in your training script
+  goal: minimize
+parameters:
+  # Fixed Parameters from config.yaml
+  model:
+    value: "xgboost"
+  
+  lags:
+    value: [1, 2, 3, 6, 12, 13, 14, 24, 25, 26, 48, 49, 72, 168]
+  
+  rolling_avgs:
+    value: [1, 3, 9, 24, 48, 72, 86, 168]
+  
+  delta_reference_points:
+    value:
+      - [1, 2]
+      - [1, 3]
+      - [1, 6]
+      - [1, 24]
+      - [24, 25]
+      - [48, 49]
+      - [169, 1]
+      - [168, 169]
+  
+  std_windows:
+    value: [3, 6, 12, 24, 48, 72, 86, 168]
+  
+  num_zeros_windows:
+    value: [6, 12, 24]
+  
+  hour_shifts:
+    value: [0, 6, 12, 18]
+  
+  weekday_shifts:
+    value: [0, 3, 6]
+  
+  push_all_lags_by:
+    value: 120
+  
+  use_station_id_feat:
+    value: true
+  
+  use_cell_id_feat:
+    value: true
+  
+  use_beam_id_feat:
+    value: true
+  
+  train_percentage:
+    value: 0.6
+  
+  val_percentage:
+    value: 0.3
+  
+  run_shap:
+    value: false
+  
+  target_df_names:
+    value: ['thp_vol', 'mr_number']
+  
+  feat_base_df_names:
+    value: ['thp_vol', 'mr_number']
+  
+  enable_categorical:
+    value: true
+  
+  # Hyperparameters to Sweep
+  eta:
+    distribution: log_uniform_values
+    min: 0.01
+    max: 0.1
+  
+  subsample:
+    distribution: uniform
+    min: 0.5
+    max: 0.99
+  
+  n_estimators:
+    distribution: int_uniform
+    min: 50
+    max: 1000
+  
+  max_depth:
+    distribution: int_uniform
+    min: 4
+    max: 15
+  
+  min_child_weight:
+    distribution: uniform
+    min: 1
+    max: 10
+  
+  gamma:
+    distribution: uniform
+    min: 0
+    max: 5
+  
+  colsample_bytree:
+    distribution: uniform
+    min: 0.5
+    max: 1.0
+  
+  objective:
+    distribution: categorical
+    values:
+      - reg:squarederror
+  
+  eval_metric:
+    distribution: categorical
+    values:
+      - mae
+  
+  enable_categorical:
+    distribution: categorical
+    values:
+      - true
+  
+  early_stopping_rounds:
+    distribution: categorical
+    values:
+      - 15

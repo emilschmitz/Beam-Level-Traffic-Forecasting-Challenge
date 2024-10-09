@@ -185,28 +185,28 @@ y_test_xgb_np = y_test_xgb.to_numpy()
 # %% [markdown]
 # ### Fit XGBoost Model
 
-# # %%
-# # Initialize XGBoost regressor
-# xgb_model = xgb.XGBRegressor(
-#     **xgb_hyperparams,
-#     callbacks=[WandbCallback(log_model=True)]
-# )
+# %%
+# Initialize XGBoost regressor
+xgb_model = xgb.XGBRegressor(
+    **xgb_hyperparams,
+    callbacks=[WandbCallback(log_model=True)]
+)
 
-# # Fit the model
-# logging.info("Training the XGBoost model on residuals...")
-# xgb_model.fit(
-#     X_train_xgb_np,
-#     y_train_xgb_np,
-#     eval_set=[(X_train_xgb_np, y_train_xgb_np), (X_test_xgb_np, y_test_xgb_np)],
-#     verbose=25
-# )
+# Fit the model
+logging.info("Training the XGBoost model on residuals...")
+xgb_model.fit(
+    X_train_xgb_np,
+    y_train_xgb_np,
+    eval_set=[(X_train_xgb_np, y_train_xgb_np), (X_test_xgb_np, y_test_xgb_np)],
+    verbose=25
+)
 
-# # %% [markdown]
-# # ## Combine Predictions
+# %% [markdown]
+# ## Combine Predictions
 
-# # %%
-# # Predict residuals on test set using XGBoost
-# residuals_pred = xgb_model.predict(X_test_xgb)
+# %%
+# Predict residuals on test set using XGBoost
+residuals_pred = xgb_model.predict(X_test_xgb)
 
 # Scale residuals back up
 epsilon = 1e-8

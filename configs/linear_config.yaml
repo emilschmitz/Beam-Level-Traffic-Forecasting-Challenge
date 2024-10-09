@@ -1,24 +1,36 @@
 # config.yaml
-model: 'xgboost'
+model: 'linear'
 
-lags: [1, 2, 3, 6, 12, 13, 14, 24, 25, 26, 48, 49, 72]
-rolling_avgs: [1, 3, 9, 24, 48, 72, 86]
+lags: [1, 2, 3, 6, 12, 
+  # 13, 14, 24, 25, 26, 48, 49, 
+  72, 168]
+rolling_avgs: [1, 3, 9, 24, 48, 72, 86, 168]
 delta_reference_points:
   - [1, 2]
-  - [1, 3]
+  # - [1, 3]
   - [1, 6]
   - [1, 24]
-  - [24, 25]
-  - [48, 49]
-std_windows: [3, 6, 12, 24, 48, 72, 86]
-num_zeros_windows: [6, 12, 24]
-hour_shifts: [0, 6, 12, 18]
-weekday_shifts: [0, 3, 6]
+  # - [24, 25]
+  # - [48, 49]
+  # - [168, 169]
+std_windows: [
+  3, 6, 12, 24, 48, 
+  # 72, 86, 168
+  ]
+num_zeros_windows: [
+  # 6, 12, 24
+  ]
+hour_shifts: [
+  # 0, 6, 12, 18
+  ]
+weekday_shifts: [
+  # 0, 3, 6
+  ]
 push_all_lags_by: 0
 
 use_station_id_feat: True
 use_cell_id_feat: True
-use_beam_id_feat: True
+use_beam_id_feat: False
 
 train_percentage: 0.6
 val_percentage: 0.3
@@ -33,5 +45,5 @@ xgb_hyperparams:
   # max_depth: 6
   subsample: 0.7
   early_stopping_rounds: 10
-  n_estimators: 1000
+  n_estimators: 100
   enable_categorical: True
