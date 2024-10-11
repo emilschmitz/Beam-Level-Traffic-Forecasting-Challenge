@@ -223,7 +223,7 @@ def convert_to_wide_format(dataframe: pl.DataFrame, output_df_names: list[str]) 
     """
     wide_dfs = {}
     for df_name in output_df_names:
-        wide_df = dataframe.pivot(index='idx_hour', columns='beam_id', values=df_name).drop('idx_hour')
+        wide_df = dataframe.pivot(index='idx_hour', on='beam_id', values=df_name).drop('idx_hour')
         wide_dfs[df_name] = wide_df
     return wide_dfs
 
