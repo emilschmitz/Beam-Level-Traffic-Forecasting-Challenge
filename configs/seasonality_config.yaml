@@ -1,6 +1,6 @@
 # seasonality_config.yaml
 
-downscaler: 0.7
+downscaler: 0.5
 
 
 # lags: []
@@ -13,8 +13,8 @@ downscaler: 0.7
 # use_station_id_feat: True
 # use_cell_id_feat: True
 # use_beam_id_feat: True
-# train_percentage: 0.6
-# val_percentage: 0.3
+train_percentage: 1
+val_percentage: 0
 # run_shap: false
 # target_df_names: ['residuals']
 # feat_base_df_names: ['residuals']
