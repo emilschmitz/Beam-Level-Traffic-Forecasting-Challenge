@@ -1,14 +1,13 @@
-# %%
-# Linear Regression and XGBoost Stacking for Traffic Forecasting
+# Linear Regression and Seasonality for Traffic Forecasting
 
 # %% [markdown]
-# # Linear Regression and XGBoost Stacking
+# # Linear Regression and Seasonality Modeling
 # In this script, we will:
 # - Fit a **Linear Regression** model to each beam's throughput volume (`thp_vol`) using only **time** as the feature.
 # - Calculate the **residuals**, scaled down by the linear predictions.
-# - Fit an **XGBoost** model to these residuals using engineered features.
+# - Apply a seasonality model to these residuals using engineered features.
 # - Combine the predictions from both models to get the final prediction.
-# 
+#
 # This method is an example of **Model Stacking** or **Residual Modeling**, where we use one model to capture the main trend and another to model the residuals.
 
 # %% [markdown]
@@ -22,8 +21,6 @@ from pathlib import Path
 import numpy as np
 import polars as pl
 import pandas as pd
-import xgboost as xgb
-from wandb.integration.xgboost import WandbCallback
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import mean_absolute_error, mean_squared_error
 import wandb
@@ -50,9 +47,6 @@ DEBUG = False
 config_file_path = Path('configs') / 'seasonality_config.yaml'
 with open(config_file_path, 'r') as file:
     config = yaml.safe_load(file)
-
-# Extract XGBoost hyperparameters from config
-xgb_hyperparams = config.get('xgb_hyperparams', {})
 
 # %% [markdown]
 # ## Data Loading
@@ -119,6 +113,10 @@ logging.info("Training the multi-output linear regression model...")
 linear_model = LinearRegression()
 linear_model.fit(X_train_linear, Y_train)
 
+# Option to scale down coefficients by a value DOWNSCALER
+DOWNSCALER = config.get('downscaler', 1.0)
+linear_model.coef_ = linear_model.coef_ / DOWNSCALER
+
 # %% [markdown]
 # ## Calculate Residuals
 
@@ -142,79 +140,35 @@ train_residuals = (Y_train - Y_train_pred_df) / (Y_train_pred_df + epsilon)
 test_residuals = (Y_test - Y_test_pred_df) / (Y_test_pred_df + epsilon)
 
 # %% [markdown]
-# ## XGBoost Model for Residuals
+# ## Seasonality Model for Residuals
 
 # %%
-# Prepare feature engineering using existing code
-# Assuming utils.create_long_format_df and related functions are available
+# Calculate seasonality component by taking the median value of the residuals for each hour across the four weeks
+logging.info("Calculating seasonality component...")
 
-# Prepare training data for XGBoost
-logging.info("Preparing data for XGBoost...")
+# Assuming we have 4 weeks of hourly data (4 * 168 rows)
+n_hours_in_week = 168
+num_weeks = 4
 
-# For training data
-target_dataframes_train = {
-    'residuals': pl.DataFrame(train_residuals),
-    # Include any other target dataframes if needed
-}
-idx_hour_series_train = idx_hour_series[:num_train_rows]
+# Reshape the residuals data to calculate the median per hour
+reshaped_train_residuals = train_residuals.to_pandas().values.reshape(num_weeks, n_hours_in_week, -1)
+seasonality_medians = np.median(reshaped_train_residuals, axis=0)
 
-long_train_df: pd.DataFrame = utils.create_long_format_df(
-    target_dataframes_train, idx_hour_series_train, config)
+# Convert the seasonality medians back to a Polars DataFrame
+seasonality_df = pl.DataFrame(seasonality_medians)
+seasonality_df.columns = Y_train.columns
 
-X_train_xgb = long_train_df.drop(columns=['residuals'])
-y_train_xgb = long_train_df['residuals']
-
-# For test data
-target_dataframes_test = {
-    'residuals': pl.DataFrame(test_residuals),
-}
-idx_hour_series_test = idx_hour_series[num_train_rows:]
-
-long_test_df = utils.create_long_format_df(
-    target_dataframes_test, idx_hour_series_test, config)
-
-X_test_xgb = long_test_df.drop(columns=['residuals'])
-y_test_xgb = long_test_df['residuals']
-
-# Convert to NumPy arrays if necessary
-X_train_xgb_np = X_train_xgb.to_numpy()
-y_train_xgb_np = y_train_xgb.to_numpy()
-X_test_xgb_np = X_test_xgb.to_numpy()
-y_test_xgb_np = y_test_xgb.to_numpy()
+# Final prediction will be updated once the seasonality model is combined
 
 # %% [markdown]
-# ### Fit XGBoost Model
+# ## Combine Predictions
 
-# # %%
-# # Initialize XGBoost regressor
-# xgb_model = xgb.XGBRegressor(
-#     **xgb_hyperparams,
-#     callbacks=[WandbCallback(log_model=True)]
-# )
-
-# # Fit the model
-# logging.info("Training the XGBoost model on residuals...")
-# xgb_model.fit(
-#     X_train_xgb_np,
-#     y_train_xgb_np,
-#     eval_set=[(X_train_xgb_np, y_train_xgb_np), (X_test_xgb_np, y_test_xgb_np)],
-#     verbose=25
-# )
-
-# # %% [markdown]
-# # ## Combine Predictions
-
-# # %%
-# # Predict residuals on test set using XGBoost
-# residuals_pred = xgb_model.predict(X_test_xgb)
-
-# Scale residuals back up
-epsilon = 1e-8
-linear_pred = Y_test_pred_df.values
-scaled_residuals_pred = residuals_pred * (linear_pred + epsilon).flatten()
-
-# Final prediction
-Y_test_final_pred = linear_pred + scaled_residuals_pred.reshape(linear_pred.shape)
+# %%
+# Combine predictions from Linear Regression and Seasonality Model
+logging.info("Combining predictions from Linear Regression and Seasonality model...")
+# Scale back up the median residuals by the linear prediction
+scaled_seasonality = seasonality_df.to_numpy() * (Y_test_pred_df.values + epsilon)
+Y_test_final_pred = Y_test_pred_df.values + scaled_seasonality
 
 # %% [markdown]
 # ## Evaluation
@@ -242,20 +196,17 @@ logging.info(f"Average Test MSE: {avg_test_mse:.4f}")
 # ## Save the Models
 
 # %%
-# Save the linear model and XGBoost model
+# Save the linear model
 model_dir = Path('checkpoints') / wandb.run.name
 model_dir.mkdir(parents=True, exist_ok=True)
 
 import pickle
 linear_model_path = model_dir / 'linear_model.pkl'
-xgb_model_path = model_dir / 'xgb_model.pkl'
 with open(linear_model_path, 'wb') as f:
     pickle.dump(linear_model, f)
-    pickle.dump(xgb_model, f)
 
-# Save models to W&B
+# Save model to W&B
 wandb.save(str(linear_model_path))
-wandb.save(str(xgb_model_path))
 
 # %% [markdown]
 # ## Plotting Predictions vs Actuals for Sample Beams

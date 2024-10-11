@@ -32,6 +32,7 @@ xgb_hyperparams:
   objective: 'reg:squarederror'
   eval_metric: 'mae'
   eta: 0.015
+  gamma: 2.8
   max_depth: 15
   subsample: 0.7
   early_stopping_rounds: 15

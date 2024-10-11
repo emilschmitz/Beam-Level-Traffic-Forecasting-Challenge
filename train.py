@@ -49,25 +49,72 @@ import utils
 
 # %%
 # %%
+DEBUG = False
+# config_file_path = Path('configs') / 'linear_config.yaml'
+# config_file_path = Path('configs') / 'autoregressive_config.yaml'
+# config_file_path = Path('configs') / '168hour_shift_config.yaml'
+config_file_path = Path('configs') / 'SWEEP_autoregressive_config.yaml'
+# Load the YAML configuration file
+with open(config_file_path, 'r') as file:
+    config = yaml.safe_load(file)
+
+class dotdict(dict):
+    """dot.notation access to dictionary attributes"""
+    __getattr__ = dict.get
+    __setattr__ = dict.__setitem__
+    __delattr__ = dict.__delitem__
+
+config = dotdict(config)
+data_dir = Path('input-data')
+target_dataframes = {
+    # This is the target variable
+    'thp_vol': pl.read_csv(data_dir / 'traffic_DLThpVol.csv'),
+    'prb': pl.read_csv(data_dir / 'traffic_DLPRB.csv'),
+    'thp_time': pl.read_csv(data_dir / 'traffic_DLThpTime.csv'),
+    'mr_number': pl.read_csv(data_dir / 'traffic_MR_number.csv')
+}
+
+# Filter target dataframes based on config
+target_dataframes = {
+    k: v for k, v in target_dataframes.items() if k in config.target_df_names}
+idx_hour_series = target_dataframes['thp_vol']['']
+
+# Drop the first column (idx hour) from each dataframe
+for k in target_dataframes:
+    target_dataframes[k] = target_dataframes[k].drop('')
+
+# Debug mode: shorten dataframes and config lists
+if DEBUG:
+    target_dataframes = {k: v.head(200).select(
+        v.columns[:800]) for k, v in target_dataframes.items()}
+
+
+# Merge xgb_hyperparams into config
+# config.update(xgb_hyperparams)
+
+# %%
+# %%
+
+# Save utils.py to W&B
+utils_path = Path('utils.py')
+# %%
+# Extract xgb_hyperparams from config
+# xgb_hyperparams = config.get('xgb_hyperparams', {})
+
+# Merge xgb_hyperparams into config
+# config.update(xgb_hyperparams)
+
+# %%
+# Use first config.train_percentage of dataframe rows for training, and the rest for validation and testing
+num_rows = len(target_dataframes['thp_vol'])
+num_train_rows = round(num_rows * config.train_percentage)
+num_val_rows = round(num_rows * config.val_percentage)
+
+# Make feature dataframes
+feature_dfs = utils.create_all_feature_dfs(
+    target_dataframes, idx_hour_series, config)
+# %%
 def train():
-    DEBUG = False
-    # config_file_path = Path('configs') / 'linear_config.yaml'
-    # config_file_path = Path('configs') / 'autoregressive_config.yaml'
-    # config_file_path = Path('configs') / '168hour_shift_config.yaml'
-    config_file_path = Path('configs') / 'SWEEP_autoregressive_config.yaml'
-
-    # %%
-    # Load the YAML configuration file
-    # with open(config_file_path, 'r') as file:
-        # config = yaml.safe_load(file)
-
-    # Extract xgb_hyperparams from config
-    # xgb_hyperparams = config.get('xgb_hyperparams', {})
-
-    # Merge xgb_hyperparams into config
-    # config.update(xgb_hyperparams)
-
-    # %%
     # Initialize W&B
     run = wandb.init(
         project="traffic-forecasting-challenge",
@@ -78,40 +125,6 @@ def train():
     )
     # %%
     # Read the CSV files
-    data_dir = Path('input-data')
-    target_dataframes = {
-        # This is the target variable
-        'thp_vol': pl.read_csv(data_dir / 'traffic_DLThpVol.csv'),
-        'prb': pl.read_csv(data_dir / 'traffic_DLPRB.csv'),
-        'thp_time': pl.read_csv(data_dir / 'traffic_DLThpTime.csv'),
-        'mr_number': pl.read_csv(data_dir / 'traffic_MR_number.csv')
-    }
-
-    # Filter target dataframes based on config
-    target_dataframes = {
-        k: v for k, v in target_dataframes.items() if k in wandb.config.target_df_names}
-
-    idx_hour_series = target_dataframes['thp_vol']['']
-
-    # Drop the first column (idx hour) from each dataframe
-    for k in target_dataframes:
-        target_dataframes[k] = target_dataframes[k].drop('')
-
-    # Debug mode: shorten dataframes and config lists
-    if DEBUG:
-        target_dataframes = {k: v.head(200).select(
-            v.columns[:800]) for k, v in target_dataframes.items()}
-        config = {k: v[:3] if isinstance(
-            v, list) else v for k, v in config.items()}
-
-    # Merge xgb_hyperparams into config
-    # config.update(xgb_hyperparams)
-
-    # %%
-    # %%
-
-    # Save utils.py to W&B
-    utils_path = Path('utils.py')
     if utils_path.exists():
         wandb.save(str(utils_path))
 
@@ -121,25 +134,16 @@ def train():
     #  The feature engineering steps are handled by utility functions.
 
     # %%
-    # %%
-    # Use first config.train_percentage of dataframe rows for training, and the rest for validation and testing
-    num_rows = len(target_dataframes['thp_vol'])
-    num_train_rows = round(num_rows * wandb.config.train_percentage)
-    num_val_rows = round(num_rows * wandb.config.val_percentage)
 
-    config = wandb.config.as_dict()
+    config = dotdict(wandb.config.as_dict())
 
-    # Make feature dataframes
-    feature_dfs = utils.create_all_feature_dfs(
-        target_dataframes, idx_hour_series, config)
-
-    train_target_dfs = {k: v.head(num_train_rows)
+    train_target_dfs = {k: v.head(num_train_rows).shift(-config.target_forward_shift)
                         for k, v in target_dataframes.items()}
     train_feature_dfs = {k: v.head(num_train_rows)
                         for k, v in feature_dfs.items()}
     train_idx_hour_series = idx_hour_series.head(num_train_rows)
 
-    val_target_dfs = {k: v.slice(num_train_rows + 1, num_val_rows)
+    val_target_dfs = {k: v.slice(num_train_rows + 1, num_val_rows).shift(-config.target_forward_shift)
                     for k, v in target_dataframes.items()}
     val_feature_dfs = {k: v.slice(num_train_rows + 1, num_val_rows)
                     for k, v in feature_dfs.items()}
@@ -218,16 +222,25 @@ def train():
     # %%
     # %%
     for target_name, model in models.items():
-        model_dir = Path('checkpoints') / wandb.run.name
+        model_dir = Path('checkpoints_final')
         model_dir.mkdir(parents=True, exist_ok=True)
-        model_path = model_dir / f'{target_name}.ubj'
+        model_path = model_dir / f'forward_shift_{wandb.config.target_forward_shift}'
         pickle.dump(model, open(model_path, 'wb'))
-        wandb.save(str(model_path))
+        # wandb.save(str(model_path))
     # %%
     wandb.finish()
 
+
 if __name__ == '__main__':
-    train()
+    sweep_configuration_path = 'wandb_sweep.yaml'
+
+    with open(sweep_configuration_path, 'r') as file:
+        sweep_configuration = yaml.safe_load(file)
+
+    sweep_id = wandb.sweep(sweep=sweep_configuration, project="traffic-forecasting-challenge")
+
+    wandb.agent(sweep_id, function=train, count=168)
+
 # %%
 # %%
 

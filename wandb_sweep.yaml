@@ -1,6 +1,6 @@
 # sweep.yaml
 program: train.py
-method: bayes
+method: grid  # Using 'grid' to exhaustively search all values of push_all_lags_by
 metric:
   name: validation_1-mae.min  # Ensure this matches the metric logged in your training script
   goal: minimize
@@ -38,9 +38,20 @@ parameters:
   weekday_shifts:
     value: [0, 3, 6]
   
-  push_all_lags_by:
-    value: 120
-  
+  target_forward_shift:  
+    values: [
+      0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 
+             21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 
+             38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 
+             55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 
+             72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 
+             89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 
+             105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 
+             119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131, 132, 
+             133, 134, 135, 136, 137, 138, 139, 140, 141, 142, 143, 144, 145, 146, 
+             147, 148, 149, 150, 151, 152, 153, 154, 155, 156, 157, 158, 159, 160, 
+             161, 162, 163, 164, 165, 166, 167]
+
   use_station_id_feat:
     value: true
   
@@ -50,11 +61,11 @@ parameters:
   use_beam_id_feat:
     value: true
   
-  train_percentage:
-    value: 0.6
+  # train_percentage:
+  #   value: 0.8
   
-  val_percentage:
-    value: 0.3
+  # val_percentage:
+  #   value: 0.2
   
   run_shap:
     value: false
@@ -68,58 +79,33 @@ parameters:
   enable_categorical:
     value: true
   
-  # Hyperparameters to Sweep
+  # Fixed XGBoost Hyperparameters from config.yaml
   eta:
-    distribution: log_uniform_values
-    min: 0.01
-    max: 0.1
+    value: 0.03
   
   subsample:
-    distribution: uniform
-    min: 0.5
-    max: 0.99
+    value: 0.7
+
+  col_subsample:
+    value: 0.9
   
   n_estimators:
-    distribution: int_uniform
-    min: 50
-    max: 1000
+    value: 125
   
   max_depth:
-    distribution: int_uniform
-    min: 4
-    max: 15
+    value: 8
   
   min_child_weight:
-    distribution: uniform
-    min: 1
-    max: 10
-  
-  gamma:
-    distribution: uniform
-    min: 0
-    max: 5
+    value: 1  # Fixed value as per config.yaml
   
   colsample_bytree:
-    distribution: uniform
-    min: 0.5
-    max: 1.0
+    value: 1.0  # Fixed value as per config.yaml
   
   objective:
-    distribution: categorical
-    values:
-      - reg:squarederror
+    value: 'reg:squarederror'
   
   eval_metric:
-    distribution: categorical
-    values:
-      - mae
+    value: 'mae'
   
-  enable_categorical:
-    distribution: categorical
-    values:
-      - true
-  
-  early_stopping_rounds:
-    distribution: categorical
-    values:
-      - 15
+  # early_stopping_rounds:
+  #   value: 200

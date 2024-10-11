@@ -88,17 +88,11 @@ def create_time_feature_dfs(idx_hour_df: pl.DataFrame, idx_hour_shifts: list[int
 
     return {**hour_feats, **weekday_feats}
 
-def create_ts_feature_dfs(df_name: str, df: pl.DataFrame, lags: list[int], rolling_avgs: list[int], delta_reference_points: list[tuple[int, int]], std_windows: list[int], num_zeros_windows: list[int], push_all_lags_by: int) -> dict[str, pl.DataFrame]:
+def create_ts_feature_dfs(df_name: str, df: pl.DataFrame, lags: list[int], rolling_avgs: list[int], delta_reference_points: list[tuple[int, int]], std_windows: list[int], num_zeros_windows: list[int]) -> dict[str, pl.DataFrame]:
     """
     Create lag, rolling average, delta, and standard deviation features for all columns in the DataFrame.
     Returns a dict of DataFrames.
     """
-    if push_all_lags_by != 0:
-        lags = [lag + push_all_lags_by for lag in lags]
-        rolling_avgs = [window + push_all_lags_by for window in rolling_avgs]
-        delta_reference_points = [(point_pair[0] + push_all_lags_by, point_pair[1] + push_all_lags_by) for point_pair in delta_reference_points]
-        std_windows = [window + push_all_lags_by for window in std_windows]
-        num_zeros_windows = [window + push_all_lags_by for window in num_zeros_windows]
 
     lag_feats = {f"{df_name}_lag_{lag}": df.shift(lag) for lag in lags}
 
@@ -207,8 +201,8 @@ def create_all_feature_dfs(target_dataframes: dict[str, pl.DataFrame], idx_hour_
     for df_name, df in base_dataframes.items():
         logging.debug(f"Creating TS features for {df_name}")
         feature_dfs.update(create_ts_feature_dfs(df_name, df, config['lags'], config['rolling_avgs'],
-                           config['delta_reference_points'], config['std_windows'], config['num_zeros_windows'],
-                           config['push_all_lags_by']))
+                           config['delta_reference_points'], config['std_windows'], config['num_zeros_windows']
+                           ))
     
     return feature_dfs
 
@@ -247,6 +241,7 @@ def create_long_format_df(target_dataframes: dict[str, pl.DataFrame], feature_da
     except KeyError:
         template_df = list(target_dataframes.values())[0]
         logging.info("thp_vol not found in target_dataframes. Using first DataFrame as template.")
+        
     cat_types = make_id_cat_type(template_df.columns)
     long_train_df = long_train_df.to_pandas()
     for col in ['beam_id', 'cell_id', 'station_id']:

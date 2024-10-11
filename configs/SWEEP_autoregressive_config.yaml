@@ -1,8 +1,17 @@
-# config.yaml
-model: 'xgboost'
+# sweep.yaml
+# program: train.py
+# method: grid  # Using 'grid' to exhaustively search all values of push_all_lags_by
+# metric:
+#   name: validation_1-mae.min  # Ensure this matches the metric logged in your training script
+#   goal: minimize
+# parameters:
+# Fixed Parameters from config.yaml
+model: "xgboost"
 
 lags: [1, 2, 3, 6, 12, 13, 14, 24, 25, 26, 48, 49, 72, 168]
+
 rolling_avgs: [1, 3, 9, 24, 48, 72, 86, 168]
+
 delta_reference_points:
   - [1, 2]
   - [1, 3]
@@ -12,21 +21,49 @@ delta_reference_points:
   - [48, 49]
   - [169, 1]
   - [168, 169]
+
 std_windows: [3, 6, 12, 24, 48, 72, 86, 168]
+
 num_zeros_windows: [6, 12, 24]
+
 hour_shifts: [0, 6, 12, 18]
+
 weekday_shifts: [0, 3, 6]
-push_all_lags_by: 120
 
-use_station_id_feat: True
-use_cell_id_feat: True
-use_beam_id_feat: True
+use_station_id_feat: true
 
-train_percentage: 0.6
-val_percentage: 0.3
+use_cell_id_feat: true
+
+use_beam_id_feat: true
+
+train_percentage: 1
+
+val_percentage: 0
+
 run_shap: false
+
 target_df_names: ['thp_vol', 'mr_number']
+
 feat_base_df_names: ['thp_vol', 'mr_number']
 
-xgb_hyperparams:
-  enable_categorical: True
+enable_categorical: true
+
+# Fixed XGBoost Hyperparameters from config.yaml
+eta: 0.05
+
+subsample: 0.7
+
+n_estimators: 200
+
+max_depth: 8
+
+min_child_weight: 1  # Fixed value as per config.yaml
+
+colsample_bytree: 1.0  # Fixed value as per config.yaml
+
+objective: 'reg:squarederror'
+
+eval_metric: 'mae'
+
+# early_stopping_rounds:
+#   value: 200
