@@ -1,6 +1,6 @@
-# My Journey in the Spatio-Temporal Beam-Level Traffic Forecasting Challenge 🚀
+# My Submission to the Spatio-Temporal Beam-Level Traffic Forecasting Challenge 📶
 
-[Check out the Competition](https://zindi.africa/competitions/spatio-temporal-beam-level-traffic-forecasting-challenge)
+[Competition Link](https://zindi.africa/competitions/spatio-temporal-beam-level-traffic-forecasting-challenge)
 
 ## Overview
 
