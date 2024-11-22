@@ -8,7 +8,7 @@ Welcome to my repository for the Spatio-Temporal Beam-Level Traffic Forecasting 
 
 ## My Approach
 
-I started by experimenting with XGBoost and ended up creating a complex model with over 100 features. However, after some testing, I realized that a simpler model actually performed better on my validation set.
+I started by experimenting with XGBoost and ended up creating a complex model with over 100 features. I used polars for feature engineering to speed up the process. However, after some testing, I realized that a simpler model actually performed better on my validation set.
 
 So, for my final submission, I went with an ensemble of a linear model and quintiles of historical data. Since the competition involved predicting data far into the future, I thought a simpler model might generalize better over such a long period.
 
